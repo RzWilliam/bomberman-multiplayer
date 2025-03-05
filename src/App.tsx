@@ -27,7 +27,7 @@ function App() {
     const id = uuidv4();
     setPlayerId(id);
 
-    const socketConnection = io("http://localhost:3001");
+    const socketConnection = io(import.meta.env.VITE_SOCKET_URL);
     setSocket(socketConnection);
 
     socketConnection.on("connect", () => {
