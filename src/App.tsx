@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BombIcon, Users, X } from "lucide-react";
+import { BombIcon, X } from "lucide-react";
 import Game from "./components/Game";
 import LobbyScreen from "./components/LobbyScreen";
 import { io, Socket } from "socket.io-client";
@@ -117,7 +117,7 @@ function App() {
       {gameState === GameState.MENU && (
         <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full">
           <div className="flex items-center justify-center mb-6">
-            <BombIcon size={40} className="text-red-500 mr-2" />
+            <img src="/icon.png" alt="Logo Bomberman" className="w-12 mr-4" />
             <h1 className="text-3xl font-bold">Bomberman</h1>
           </div>
 
