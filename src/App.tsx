@@ -210,7 +210,7 @@ function App() {
           {isHost ? (
             <button
               onClick={playAgain}
-              className="bg-blue-600 hover:bg-blue-700 p-3 rounded font-medium transition-all"
+              className="bg-blue-600 hover:bg-blue-700 p-3 rounded font-medium transition-all mr-2"
             >
               Play Again
             </button>

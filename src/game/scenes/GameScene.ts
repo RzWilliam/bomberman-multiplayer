@@ -17,6 +17,7 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private playerColors = [0x0000ff, 0xff0000, 0x00ff00, 0xffff00];
+  private isGameActive: boolean = true;
 
   constructor() {
     super("GameScene");
@@ -26,12 +27,18 @@ export class GameScene extends Phaser.Scene {
     this.socket = this.game.registry.get("socket");
     this.roomId = this.game.registry.get("roomId");
     this.playerId = this.game.registry.get("playerId");
+    this.isGameActive = true;
 
     // Initialize input
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.spaceKey = this.input.keyboard!.addKey(
       Phaser.Input.Keyboard.KeyCodes.SPACE
     );
+
+    // Clear existing game objects
+    this.players.clear();
+    this.bombs.clear();
+    this.powerUps.clear();
   }
 
   create() {
@@ -49,6 +56,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   update() {
+    if (!this.isGameActive) return;
+
     // Handle player input
     this.handlePlayerInput();
 
@@ -73,58 +82,100 @@ export class GameScene extends Phaser.Scene {
   private setupSocketListeners() {
     // Game state update
     this.socket.on("gameState", (data) => {
+      if (!this.isGameActive) return;
       this.updateGameState(data);
     });
 
     // Map update
     this.socket.on("mapUpdate", (data) => {
+      if (!this.isGameActive) return;
       this.updateMap(data.map);
     });
 
     // New player joined
     this.socket.on("newPlayer", (data) => {
+      if (!this.isGameActive) return;
       this.addPlayer(data.player);
     });
 
     // Player left
     this.socket.on("playerLeft", (data) => {
+      if (!this.isGameActive) return;
       this.removePlayer(data.playerId);
     });
 
     // Bomb placed
     this.socket.on("bombPlaced", (data) => {
+      if (!this.isGameActive) return;
       this.addBomb(data.bomb);
     });
 
     // Bomb exploded
     this.socket.on("bombExploded", (data) => {
+      if (!this.isGameActive) return;
       this.explodeBomb(data.bombId, data.explosionTiles);
     });
 
     // Box destroyed
     this.socket.on("boxDestroyed", (data) => {
+      if (!this.isGameActive) return;
       this.destroyBox(data.x, data.y);
     });
 
     // Power-up spawned
     this.socket.on("powerUpSpawned", (data) => {
+      if (!this.isGameActive) return;
       this.spawnPowerUp(data.powerUp);
     });
 
     // Power-up collected
     this.socket.on("powerUpCollected", (data) => {
+      if (!this.isGameActive) return;
       this.collectPowerUp(data.powerUpId, data.playerId);
     });
 
     // Player died
     this.socket.on("playerDied", (data) => {
+      if (!this.isGameActive) return;
       this.killPlayer(data.playerId);
     });
 
     // Game over
     this.socket.on("gameOver", (data) => {
+      if (!this.isGameActive) return;
       this.gameOver(data.winner);
     });
+
+    // Game reset
+    this.socket.on("gameReset", () => {
+      this.cleanupScene();
+      this.scene.restart();
+    });
+  }
+
+  private cleanupScene() {
+    this.isGameActive = false;
+
+    // Clean up all game objects
+    this.players.forEach((player) => player.destroy());
+    this.bombs.forEach((bomb) => bomb.destroy());
+    this.powerUps.forEach((powerUp) => powerUp.destroy());
+
+    // Clear collections
+    this.players.clear();
+    this.bombs.clear();
+    this.powerUps.clear();
+
+    // Clean up physics groups
+    if (this.walls) {
+      this.walls.clear(true, true);
+    }
+    if (this.boxes) {
+      this.boxes.clear(true, true);
+    }
+
+    // Remove all socket listeners
+    this.socket.removeAllListeners();
   }
 
   private handlePlayerInput() {
@@ -287,7 +338,7 @@ export class GameScene extends Phaser.Scene {
 
   private explodeBomb(bombId: string, explosionTiles: any[]) {
     const bomb = this.bombs.get(bombId);
-    if (bomb) {
+    if (bomb && this.isGameActive) {
       bomb.explode(explosionTiles);
       this.bombs.delete(bombId);
     }
@@ -343,6 +394,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private gameOver(winner: string) {
+    if (!this.isGameActive) return;
+
+    this.isGameActive = false;
+
     // Display winner and transition back to the lobby
     const winnerText = this.add
       .text(
@@ -360,7 +415,17 @@ export class GameScene extends Phaser.Scene {
 
     // Add a delay before returning to the lobby
     this.time.delayedCall(5000, () => {
-      winnerText.destroy();
+      if (winnerText.scene) {
+        winnerText.destroy();
+      }
     });
+  }
+
+  shutdown() {
+    this.cleanupScene();
+  }
+
+  destroy() {
+    this.cleanupScene();
   }
 }
