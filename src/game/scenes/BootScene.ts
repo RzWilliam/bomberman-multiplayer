@@ -7,7 +7,7 @@ export class BootScene extends Phaser.Scene {
 
   preload() {
     // Load assets
-    this.load.spritesheet("player", "assets/bomberman.png", {
+    this.load.spritesheet("player", "assets/player.png", {
       frameWidth: 16,
       frameHeight: 25
     });
