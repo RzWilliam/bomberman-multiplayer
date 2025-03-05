@@ -3,6 +3,10 @@ import { v4 as uuidv4 } from 'uuid';
 // Power-up types
 const POWERUP_TYPES = ['bomb', 'speed', 'power'];
 
+// Player speed constants
+const BASE_SPEED = 50;
+const MAX_SPEED = 100;
+
 export class GameRoom {
   constructor(id, io) {
     this.id = id;
@@ -37,7 +41,7 @@ export class GameRoom {
       bombCount: 1,
       bombsPlaced: 0,
       bombPower: 1,
-      speed: 150,
+      speed: BASE_SPEED,
       alive: true
     });
   }
@@ -80,7 +84,7 @@ export class GameRoom {
       player.bombCount = 1;
       player.bombsPlaced = 0;
       player.bombPower = 1;
-      player.speed = 150;
+      player.speed = BASE_SPEED;
       player.alive = true;
       player.isReady = false;
     });
@@ -209,7 +213,7 @@ export class GameRoom {
     if (!player || !player.alive) return;
     
     const tileSize = 40;
-    const speed = player.speed * 0.033; // Adjust for frame rate
+    const speed = player.speed * 0.016; // Adjusted for smoother movement
     
     // Calculate new position
     let newX = player.x + dirX * speed;
@@ -466,7 +470,8 @@ export class GameRoom {
         player.bombCount++;
         break;
       case 'speed':
-        player.speed += 30;
+        // Increase speed but don't exceed max speed
+        player.speed = Math.min(player.speed + 20, MAX_SPEED);
         break;
       case 'power':
         player.bombPower++;
