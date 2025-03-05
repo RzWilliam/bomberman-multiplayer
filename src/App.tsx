@@ -1,60 +1,66 @@
-import { useEffect, useState } from 'react';
-import { BombIcon } from 'lucide-react';
-import Game from './components/Game';
-import LobbyScreen from './components/LobbyScreen';
-import { io, Socket } from 'socket.io-client';
-import { v4 as uuidv4 } from 'uuid';
+import { useEffect, useState } from "react";
+import { BombIcon, Users, X } from "lucide-react";
+import Game from "./components/Game";
+import LobbyScreen from "./components/LobbyScreen";
+import { io, Socket } from "socket.io-client";
+import { v4 as uuidv4 } from "uuid";
 
 enum GameState {
   MENU,
   LOBBY,
   PLAYING,
-  GAME_OVER
+  GAME_OVER,
 }
 
 function App() {
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [roomId, setRoomId] = useState<string>('');
-  const [playerId, setPlayerId] = useState<string>('');
-  const [playerName, setPlayerName] = useState<string>('');
+  const [roomId, setRoomId] = useState<string>("");
+  const [playerId, setPlayerId] = useState<string>("");
+  const [playerName, setPlayerName] = useState<string>("");
   const [isHost, setIsHost] = useState<boolean>(false);
   const [players, setPlayers] = useState<any[]>([]);
   const [winner, setWinner] = useState<string | null>(null);
+  const [showJoinModal, setShowJoinModal] = useState<boolean>(false);
 
   useEffect(() => {
     const id = uuidv4();
     setPlayerId(id);
 
-    const socketConnection = io('http://localhost:3001');
+    const socketConnection = io("http://localhost:3001");
     setSocket(socketConnection);
 
-    socketConnection.on('connect', () => {
-      console.log('Connected to server');
+    socketConnection.on("connect", () => {
+      console.log("Connected to server");
     });
 
-    socketConnection.on('roomJoined', (data) => {
+    socketConnection.on("roomJoined", (data) => {
       setRoomId(data.roomId);
       setIsHost(data.isHost);
       setPlayers(data.players);
       setGameState(GameState.LOBBY);
+      setShowJoinModal(false);
     });
 
-    socketConnection.on('playerJoined', (data) => {
+    socketConnection.on("playerJoined", (data) => {
       setPlayers(data.players);
     });
 
-    socketConnection.on('playerLeft', (data) => {
+    socketConnection.on("playerLeft", (data) => {
       setPlayers(data.players);
     });
 
-    socketConnection.on('gameStarted', () => {
+    socketConnection.on("gameStarted", () => {
       setGameState(GameState.PLAYING);
     });
 
-    socketConnection.on('gameOver', (data) => {
+    socketConnection.on("gameOver", (data) => {
       setWinner(data.winner);
       setGameState(GameState.GAME_OVER);
+    });
+
+    socketConnection.on("error", (data) => {
+      alert(data.message);
     });
 
     return () => {
@@ -64,25 +70,25 @@ function App() {
 
   const createRoom = () => {
     if (socket && playerName.trim()) {
-      socket.emit('createRoom', { playerId, playerName });
+      socket.emit("createRoom", { playerId, playerName });
     }
   };
 
   const joinRoom = () => {
     if (socket && roomId && playerName.trim()) {
-      socket.emit('joinRoom', { roomId, playerId, playerName });
+      socket.emit("joinRoom", { roomId, playerId, playerName });
     }
   };
 
   const startGame = () => {
     if (socket && isHost) {
-      socket.emit('startGame', { roomId });
+      socket.emit("startGame", { roomId });
     }
   };
 
   const playAgain = () => {
     if (socket && isHost) {
-      socket.emit('restartGame', { roomId });
+      socket.emit("restartGame", { roomId });
       setGameState(GameState.LOBBY);
       setWinner(null);
     }
@@ -90,12 +96,20 @@ function App() {
 
   const leaveRoom = () => {
     if (socket) {
-      socket.emit('leaveRoom', { roomId, playerId });
+      socket.emit("leaveRoom", { roomId, playerId });
       setGameState(GameState.MENU);
-      setRoomId('');
+      setRoomId("");
       setIsHost(false);
       setPlayers([]);
     }
+  };
+
+  const openJoinModal = () => {
+    setShowJoinModal(true);
+  };
+
+  const closeJoinModal = () => {
+    setShowJoinModal(false);
   };
 
   return (
@@ -106,8 +120,8 @@ function App() {
             <BombIcon size={40} className="text-red-500 mr-2" />
             <h1 className="text-3xl font-bold">Bomberman</h1>
           </div>
-          
-          <div className="mb-4">
+
+          <div className="mb-6">
             <label className="block text-sm font-medium mb-1">Your Name</label>
             <input
               type="text"
@@ -117,34 +131,59 @@ function App() {
               placeholder="Enter your name"
             />
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4">
-            <div>
+            <button
+              onClick={createRoom}
+              disabled={!playerName.trim()}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 p-3 rounded font-medium transition-all"
+            >
+              Create Room
+            </button>
+
+            <button
+              onClick={openJoinModal}
+              disabled={!playerName.trim()}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 p-3 rounded font-medium transition-all"
+            >
+              Join Room
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Join Room Modal */}
+      {showJoinModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Join Room</h2>
               <button
-                onClick={createRoom}
-                disabled={!playerName.trim()}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 p-2 rounded font-medium transition-all"
+                onClick={closeJoinModal}
+                className="text-gray-400 hover:text-white"
               >
-                Create Room
+                <X size={24} />
               </button>
             </div>
-            
-            <div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Room ID</label>
               <input
                 type="text"
                 value={roomId}
-                onChange={(e) => setRoomId(e.target.value)}
-                className="w-full p-2 bg-gray-700 rounded text-white mb-2"
-                placeholder="Room ID"
+                onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+                className="w-full p-2 bg-gray-700 rounded text-white"
+                placeholder="Enter room ID"
               />
-              <button
-                onClick={joinRoom}
-                disabled={!roomId || !playerName.trim()}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 p-2 rounded font-medium transition-all"
-              >
-                Join Room
-              </button>
             </div>
+
+            <button
+              onClick={joinRoom}
+              disabled={!roomId || !playerName.trim()}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 p-3 rounded font-medium transition-all"
+            >
+              Join Game
+            </button>
           </div>
         </div>
       )}
@@ -160,18 +199,14 @@ function App() {
       )}
 
       {gameState === GameState.PLAYING && socket && (
-        <Game
-          socket={socket}
-          roomId={roomId}
-          playerId={playerId}
-        />
+        <Game socket={socket} roomId={roomId} playerId={playerId} />
       )}
 
       {gameState === GameState.GAME_OVER && (
         <div className="bg-gray-800 p-8 rounded-lg shadow-lg max-w-md w-full text-center">
           <h1 className="text-3xl font-bold mb-4">Game Over</h1>
           <p className="text-xl mb-6">{winner} wins!</p>
-          
+
           {isHost ? (
             <button
               onClick={playAgain}
@@ -182,7 +217,7 @@ function App() {
           ) : (
             <p className="text-gray-400 mb-4">Waiting for host to restart...</p>
           )}
-          
+
           <button
             onClick={leaveRoom}
             className="bg-red-600 hover:bg-red-700 p-3 rounded font-medium mt-4 transition-all"
