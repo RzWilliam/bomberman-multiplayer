@@ -68,7 +68,7 @@ export class Bomb extends Phaser.Physics.Arcade.Sprite {
         targets: explosion,
         scale: { from: 0.1, to: 1 },
         alpha: { from: 1, to: 0 },
-        duration: 300,
+        duration: 600,
         ease: "Power2",
         onComplete: () => {
           explosion.destroy();

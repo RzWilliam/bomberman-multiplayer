@@ -279,6 +279,13 @@ export class GameScene extends Phaser.Scene {
     this.players.forEach((player) => {
       this.physics.add.collider(player, this.walls);
       this.physics.add.collider(player, this.boxes);
+
+      // Add colliders with other players
+      this.players.forEach((otherPlayer) => {
+        if (player !== otherPlayer) {
+          this.physics.add.collider(player, otherPlayer);
+        }
+      });
     });
   }
 
@@ -301,6 +308,18 @@ export class GameScene extends Phaser.Scene {
     // Add colliders for the new player
     this.physics.add.collider(player, this.walls);
     this.physics.add.collider(player, this.boxes);
+
+    // Add colliders with other players
+    this.players.forEach((otherPlayer) => {
+      if (player !== otherPlayer) {
+        this.physics.add.collider(player, otherPlayer);
+      }
+    });
+
+    // Add colliders with bombs
+    this.bombs.forEach((bomb) => {
+      this.physics.add.collider(player, bomb);
+    });
 
     // Add overlap with power-ups
     this.powerUps.forEach((powerUp) => {
@@ -335,6 +354,11 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.bombs.set(bombData.id, bomb);
+
+    // Add colliders with all players
+    this.players.forEach((player) => {
+      this.physics.add.collider(player, bomb);
+    });
   }
 
   private explodeBomb(bombId: string, explosionTiles: any[]) {

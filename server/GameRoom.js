@@ -7,6 +7,11 @@ const POWERUP_TYPES = ['bomb', 'speed', 'power'];
 const BASE_SPEED = 100;
 const MAX_SPEED = 200;
 
+// Game constants
+const TILE_SIZE = 40;
+const PLAYER_RADIUS = 12;
+const BOMB_RADIUS = 16;
+
 export class GameRoom {
   constructor(id, io) {
     this.id = id;
@@ -19,6 +24,7 @@ export class GameRoom {
     this.powerUps = {};
     this.gameLoopInterval = null;
     this.lastUpdateTime = 0;
+    this.playerBombOverlaps = new Map(); // Track which players are overlapping with which bombs
   }
 
   getPlayers() {
@@ -48,6 +54,7 @@ export class GameRoom {
 
   removePlayer(playerId) {
     this.players = this.players.filter(player => player.id !== playerId);
+    this.playerBombOverlaps.delete(playerId);
   }
 
   assignNewHost() {
@@ -71,6 +78,7 @@ export class GameRoom {
     this.map = [];
     this.bombs = {};
     this.powerUps = {};
+    this.playerBombOverlaps.clear();
     
     if (this.gameLoopInterval) {
       clearInterval(this.gameLoopInterval);
@@ -122,8 +130,8 @@ export class GameRoom {
           // Walls around the edges and in a grid pattern
           this.map[y][x] = 1;
         } else {
-          // 40% chance of a box in empty spaces
-          this.map[y][x] = Math.random() < 0.4 ? 2 : 0;
+          // 60% chance of a box in empty spaces
+          this.map[y][x] = Math.random() < 0.6 ? 2 : 0;
         }
       }
     }
@@ -131,9 +139,9 @@ export class GameRoom {
     // Clear spawn areas for players
     const spawnPoints = [
       { x: 1, y: 1 },                           // Top-left
+      { x: mapSize - 2, y: mapSize - 2 },       // Bottom-right
       { x: mapSize - 2, y: 1 },                 // Top-right
-      { x: 1, y: mapSize - 2 },                 // Bottom-left
-      { x: mapSize - 2, y: mapSize - 2 }        // Bottom-right
+      { x: 1, y: mapSize - 2 }                  // Bottom-left
     ];
     
     spawnPoints.forEach(point => {
@@ -150,20 +158,19 @@ export class GameRoom {
 
   positionPlayers() {
     const mapSize = this.map.length;
-    const tileSize = 40;
     
     const spawnPoints = [
       { x: 1, y: 1 },                           // Top-left
+      { x: mapSize - 2, y: mapSize - 2 },       // Bottom-right
       { x: mapSize - 2, y: 1 },                 // Top-right
-      { x: 1, y: mapSize - 2 },                 // Bottom-left
-      { x: mapSize - 2, y: mapSize - 2 }        // Bottom-right
+      { x: 1, y: mapSize - 2 }                  // Bottom-left
     ];
     
     // Assign spawn points to players
     this.players.forEach((player, index) => {
       const spawn = spawnPoints[index % spawnPoints.length];
-      player.x = spawn.x * tileSize + tileSize / 2;
-      player.y = spawn.y * tileSize + tileSize / 2;
+      player.x = spawn.x * TILE_SIZE + TILE_SIZE / 2;
+      player.y = spawn.y * TILE_SIZE + TILE_SIZE / 2;
     });
   }
 
@@ -193,6 +200,9 @@ export class GameRoom {
     // Update bombs
     this.updateBombs(deltaTime);
     
+    // Update bomb overlaps
+    this.updateBombOverlaps();
+    
     // Check for game over condition
     this.checkGameOver();
   }
@@ -208,40 +218,63 @@ export class GameRoom {
     });
   }
 
+  updateBombOverlaps() {
+    // Update which players are overlapping with which bombs
+    this.players.forEach(player => {
+      if (!player.alive) return;
+
+      const overlappingBombs = new Set();
+      
+      Object.values(this.bombs).forEach(bomb => {
+        const dx = player.x - bomb.x;
+        const dy = player.y - bomb.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < (PLAYER_RADIUS + BOMB_RADIUS)) {
+          overlappingBombs.add(bomb.id);
+        }
+      });
+      
+      this.playerBombOverlaps.set(player.id, overlappingBombs);
+    });
+  }
+
   movePlayer(playerId, dirX, dirY, deltaTime) {
     const player = this.getPlayerById(playerId);
     if (!player || !player.alive) return;
 
-    const tileSize = 40;
-
-    // Utilisation de deltaTime pour que le mouvement soit indépendant des FPS
+    // Calculate new position
     const distance = player.speed * deltaTime;
-
     let newX = player.x + dirX * distance;
     let newY = player.y + dirY * distance;
 
-    if (this.canMoveTo(newX, newY)) {
+    // Check collisions with walls and boxes
+    if (this.canMoveTo(newX, newY, player)) {      
+      // Check collisions with bombs, but only with bombs the player isn't already overlapping
+      const bombCollision = this.checkBombCollisions(newX, newY, player);
+
+      if (!bombCollision) {
         player.x = newX;
         player.y = newY;
-    } else {
-        if (dirX !== 0 && this.canMoveTo(player.x, newY)) {
-            player.y = newY;
-        } else if (dirY !== 0 && this.canMoveTo(newX, player.y)) {
-            player.x = newX;
+      } else {
+        // Try sliding along walls
+        if (dirX !== 0 && this.canMoveTo(player.x, newY, player) && 
+            !this.checkBombCollisions(player.x, newY, player)) {
+          player.y = newY;
+        } else if (dirY !== 0 && this.canMoveTo(newX, player.y, player) && 
+                   !this.checkBombCollisions(newX, player.y, player)) {
+          player.x = newX;
         }
+      }
     }
 
     this.checkPowerUpCollection(player);
-}
+  }
 
-
-  canMoveTo(x, y) {
-    const tileSize = 40;
-    const playerRadius = 12;
-    
+  canMoveTo(x, y, player) {
     // Get the grid coordinates
-    const gridX = Math.floor(x / tileSize);
-    const gridY = Math.floor(y / tileSize);
+    const gridX = Math.floor(x / TILE_SIZE);
+    const gridY = Math.floor(y / TILE_SIZE);
     
     // Check surrounding tiles
     for (let offsetY = -1; offsetY <= 1; offsetY++) {
@@ -257,10 +290,10 @@ export class GameRoom {
         // If the tile is a wall or box
         if (this.map[checkY][checkX] === 1 || this.map[checkY][checkX] === 2) {
           // Calculate the closest point on the tile to the player
-          const tileLeft = checkX * tileSize;
-          const tileRight = tileLeft + tileSize;
-          const tileTop = checkY * tileSize;
-          const tileBottom = tileTop + tileSize;
+          const tileLeft = checkX * TILE_SIZE;
+          const tileRight = tileLeft + TILE_SIZE;
+          const tileTop = checkY * TILE_SIZE;
+          const tileBottom = tileTop + TILE_SIZE;
           
           const closestX = Math.max(tileLeft, Math.min(x, tileRight));
           const closestY = Math.max(tileTop, Math.min(y, tileBottom));
@@ -271,7 +304,7 @@ export class GameRoom {
           const distance = Math.sqrt(distX * distX + distY * distY);
           
           // If the distance is less than the player radius, there's a collision
-          if (distance < playerRadius) {
+          if (distance < PLAYER_RADIUS) {
             return false;
           }
         }
@@ -281,6 +314,35 @@ export class GameRoom {
     return true;
   }
 
+  // checkPlayerCollisions(x, y, currentPlayer) {
+  //   return this.players.some(player => {
+  //     if (player.id === currentPlayer.id || !player.alive) return false;
+
+  //     const dx = x - player.x;
+  //     const dy = y - player.y;
+  //     const distance = Math.sqrt(dx * dx + dy * dy);
+
+  //     return distance < PLAYER_RADIUS * 2;
+  //   });
+  // }
+
+  checkBombCollisions(x, y, player) {
+    const overlappingBombs = this.playerBombOverlaps.get(player.id) || new Set();
+
+    return Object.values(this.bombs).some(bomb => {
+      // Skip bombs that the player is already overlapping with
+      if (overlappingBombs.has(bomb.id)) {
+        return false;
+      }
+
+      const dx = x - bomb.x;
+      const dy = y - bomb.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      return distance < (PLAYER_RADIUS + BOMB_RADIUS);
+    });
+  }
+
   placeBomb(playerId) {
     const player = this.getPlayerById(playerId);
     if (!player || !player.alive) return;
@@ -288,11 +350,9 @@ export class GameRoom {
     // Check if player has bombs available
     if (player.bombsPlaced >= player.bombCount) return;
     
-    const tileSize = 40;
-    
     // Get the grid coordinates
-    const gridX = Math.floor(player.x / tileSize);
-    const gridY = Math.floor(player.y / tileSize);
+    const gridX = Math.floor(player.x / TILE_SIZE);
+    const gridY = Math.floor(player.y / TILE_SIZE);
     
     // Check if there's already a bomb at this position
     const bombPosition = `${gridX},${gridY}`;
@@ -307,8 +367,8 @@ export class GameRoom {
     const bomb = {
       id: bombId,
       playerId,
-      x: gridX * tileSize + tileSize / 2,
-      y: gridY * tileSize + tileSize / 2,
+      x: gridX * TILE_SIZE + TILE_SIZE / 2,
+      y: gridY * TILE_SIZE + TILE_SIZE / 2,
       gridX,
       gridY,
       position: bombPosition,
@@ -318,6 +378,11 @@ export class GameRoom {
     
     this.bombs[bombId] = bomb;
     player.bombsPlaced++;
+
+    // Add the bomb to the player's overlapping bombs set
+    const overlappingBombs = this.playerBombOverlaps.get(playerId) || new Set();
+    overlappingBombs.add(bombId);
+    this.playerBombOverlaps.set(playerId, overlappingBombs);
     
     // Notify clients
     this.io.to(this.id).emit('bombPlaced', { bomb });
@@ -332,7 +397,6 @@ export class GameRoom {
       player.bombsPlaced--;
     }
     
-    const tileSize = 40;
     const explosionTiles = [];
     
     // Add center tile
@@ -369,8 +433,8 @@ export class GameRoom {
         
         // Add explosion tile
         explosionTiles.push({
-          x: checkX * tileSize + tileSize / 2,
-          y: checkY * tileSize + tileSize / 2,
+          x: checkX * TILE_SIZE + TILE_SIZE / 2,
+          y: checkY * TILE_SIZE + TILE_SIZE / 2,
           gridX: checkX,
           gridY: checkY
         });
@@ -387,8 +451,8 @@ export class GameRoom {
     this.players.forEach(player => {
       if (!player.alive) return;
       
-      const playerGridX = Math.floor(player.x / tileSize);
-      const playerGridY = Math.floor(player.y / tileSize);
+      const playerGridX = Math.floor(player.x / TILE_SIZE);
+      const playerGridY = Math.floor(player.y / TILE_SIZE);
       
       // Check if player is in explosion range
       const inExplosion = explosionTiles.some(tile => 
@@ -397,6 +461,14 @@ export class GameRoom {
       
       if (inExplosion) {
         this.killPlayer(player.id);
+      }
+    });
+
+    // Remove the bomb from all players' overlapping sets
+    this.players.forEach(player => {
+      const overlappingBombs = this.playerBombOverlaps.get(player.id);
+      if (overlappingBombs) {
+        overlappingBombs.delete(bombId);
       }
     });
     
@@ -415,7 +487,7 @@ export class GameRoom {
     this.map[y][x] = 0;
     
     // Notify clients
-    this.io.to(this.id).emit('boxDestroyed', { x: x * 40 + 20, y: y * 40 + 20 });
+    this.io.to(this.id).emit('boxDestroyed', { x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2 });
     
     // 30% chance to spawn a power-up
     if (Math.random() < 0.3) {
@@ -424,14 +496,13 @@ export class GameRoom {
   }
 
   spawnPowerUp(x, y) {
-    const tileSize = 40;
     const powerUpId = uuidv4();
     const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
     
     const powerUp = {
       id: powerUpId,
-      x: x * tileSize + tileSize / 2,
-      y: y * tileSize + tileSize / 2,
+      x: x * TILE_SIZE + TILE_SIZE / 2,
+      y: y * TILE_SIZE + TILE_SIZE / 2,
       gridX: x,
       gridY: y,
       type
@@ -444,9 +515,8 @@ export class GameRoom {
   }
 
   checkPowerUpCollection(player) {
-    const tileSize = 40;
-    const playerGridX = Math.floor(player.x / tileSize);
-    const playerGridY = Math.floor(player.y / tileSize);
+    const playerGridX = Math.floor(player.x / TILE_SIZE);
+    const playerGridY = Math.floor(player.y / TILE_SIZE);
     
     Object.keys(this.powerUps).forEach(powerUpId => {
       const powerUp = this.powerUps[powerUpId];
