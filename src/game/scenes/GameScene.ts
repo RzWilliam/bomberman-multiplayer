@@ -68,6 +68,53 @@ export class GameScene extends Phaser.Scene {
     this.bombs.forEach((bomb) => bomb.update());
   }
 
+  private handlePlayerInput() {
+    const player = this.players.get(this.playerId);
+    if (!player) return;
+
+    // Movement
+    let dirX = 0;
+    let dirY = 0;
+
+    if (this.cursors.left.isDown) {
+      dirX = -1;
+      player.setVelocityX(-player.speed);
+    } else if (this.cursors.right.isDown) {
+      dirX = 1;
+      player.setVelocityX(player.speed);
+    } else {
+      player.setVelocityX(0);
+    }
+
+    if (this.cursors.up.isDown) {
+      dirY = -1;
+      player.setVelocityY(-player.speed);
+    } else if (this.cursors.down.isDown) {
+      dirY = 1;
+      player.setVelocityY(player.speed);
+    } else {
+      player.setVelocityY(0);
+    }
+
+    if (dirX !== 0 || dirY !== 0) {
+      this.socket.emit("playerMove", {
+        roomId: this.roomId,
+        playerId: this.playerId,
+        dirX,
+        dirY,
+        deltaTime: this.game.loop.delta / 1000,
+      });
+    }
+
+    // Place bomb
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      this.socket.emit("placeBomb", {
+        roomId: this.roomId,
+        playerId: this.playerId,
+      });
+    }
+  }
+
   private createMap() {
     // Create background
     this.add.rectangle(0, 0, 600, 600, 0x00aa44).setOrigin(0, 0);
@@ -176,39 +223,6 @@ export class GameScene extends Phaser.Scene {
 
     // Remove all socket listeners
     this.socket.removeAllListeners();
-  }
-
-  private handlePlayerInput() {
-    const player = this.players.get(this.playerId);
-    if (!player) return;
-
-    // Movement
-    let dirX = 0;
-    let dirY = 0;
-
-    if (this.cursors.left.isDown) dirX = -1;
-    else if (this.cursors.right.isDown) dirX = 1;
-
-    if (this.cursors.up.isDown) dirY = -1;
-    else if (this.cursors.down.isDown) dirY = 1;
-
-    if (dirX !== 0 || dirY !== 0) {
-      this.socket.emit("playerMove", {
-        roomId: this.roomId,
-        playerId: this.playerId,
-        dirX,
-        dirY,
-        deltaTime: this.game.loop.delta / 1000,
-      });
-    }
-
-    // Place bomb
-    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      this.socket.emit("placeBomb", {
-        roomId: this.roomId,
-        playerId: this.playerId,
-      });
-    }
   }
 
   private updateGameState(data: any) {
