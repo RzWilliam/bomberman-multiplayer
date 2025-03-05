@@ -79,7 +79,7 @@ const LobbyScreen: React.FC<LobbyScreenProps> = ({
               <button
                 onClick={onStartGame}
                 disabled={!canStartGame}
-                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded font-medium flex items-center"
+                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-4 py-2 rounded font-medium flex items-center"
               >
                 <Play size={16} className="mr-1" />
                 Start Game

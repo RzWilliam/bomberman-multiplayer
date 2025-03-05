@@ -136,7 +136,7 @@ function App() {
             <button
               onClick={createRoom}
               disabled={!playerName.trim()}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 p-3 rounded font-medium transition-all"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed p-3 rounded font-medium transition-all"
             >
               Create Room
             </button>
@@ -144,7 +144,7 @@ function App() {
             <button
               onClick={openJoinModal}
               disabled={!playerName.trim()}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 p-3 rounded font-medium transition-all"
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed p-3 rounded font-medium transition-all"
             >
               Join Room
             </button>
@@ -180,7 +180,7 @@ function App() {
             <button
               onClick={joinRoom}
               disabled={!roomId || !playerName.trim()}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 p-3 rounded font-medium transition-all"
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed p-3 rounded font-medium transition-all"
             >
               Join Game
             </button>
