@@ -51,7 +51,7 @@ const Game: React.FC<GameProps> = ({ socket, roomId, playerId }) => {
   }, [socket, roomId, playerId]);
 
   return (
-    <div className="w-full max-w-4xl">
+    <div className="d-flex flex-column align-items-center">
       <div ref={gameRef} className="rounded-lg overflow-hidden shadow-lg"></div>
     </div>
   );
