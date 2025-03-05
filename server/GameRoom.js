@@ -4,8 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 const POWERUP_TYPES = ['bomb', 'speed', 'power'];
 
 // Player speed constants
-const BASE_SPEED = 50;
-const MAX_SPEED = 100;
+const BASE_SPEED = 100;
+const MAX_SPEED = 200;
 
 export class GameRoom {
   constructor(id, io) {
@@ -208,33 +208,32 @@ export class GameRoom {
     });
   }
 
-  movePlayer(playerId, dirX, dirY) {
+  movePlayer(playerId, dirX, dirY, deltaTime) {
     const player = this.getPlayerById(playerId);
     if (!player || !player.alive) return;
-    
+
     const tileSize = 40;
-    const speed = player.speed * 0.016; // Adjusted for smoother movement
-    
-    // Calculate new position
-    let newX = player.x + dirX * speed;
-    let newY = player.y + dirY * speed;
-    
-    // Check collision with walls and boxes
+
+    // Utilisation de deltaTime pour que le mouvement soit indépendant des FPS
+    const distance = player.speed * deltaTime;
+
+    let newX = player.x + dirX * distance;
+    let newY = player.y + dirY * distance;
+
     if (this.canMoveTo(newX, newY)) {
-      player.x = newX;
-      player.y = newY;
-    } else {
-      // Try to slide along walls
-      if (dirX !== 0 && this.canMoveTo(player.x, newY)) {
-        player.y = newY;
-      } else if (dirY !== 0 && this.canMoveTo(newX, player.y)) {
         player.x = newX;
-      }
+        player.y = newY;
+    } else {
+        if (dirX !== 0 && this.canMoveTo(player.x, newY)) {
+            player.y = newY;
+        } else if (dirY !== 0 && this.canMoveTo(newX, player.y)) {
+            player.x = newX;
+        }
     }
-    
-    // Check for power-up collection
+
     this.checkPowerUpCollection(player);
-  }
+}
+
 
   canMoveTo(x, y) {
     const tileSize = 40;

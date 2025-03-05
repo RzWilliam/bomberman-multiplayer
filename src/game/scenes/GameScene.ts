@@ -198,6 +198,7 @@ export class GameScene extends Phaser.Scene {
         playerId: this.playerId,
         dirX,
         dirY,
+        deltaTime: this.game.loop.delta / 1000,
       });
     }
 

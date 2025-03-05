@@ -171,12 +171,12 @@ io.on('connection', (socket) => {
   });
 
   // Player movement
-  socket.on('playerMove', ({ roomId, playerId, dirX, dirY }) => {
+  socket.on('playerMove', ({ roomId, playerId, dirX, dirY, deltaTime }) => {
     const room = rooms.get(roomId);
     
     if (!room || !room.isGameStarted()) return;
     
-    room.movePlayer(playerId, dirX, dirY);
+    room.movePlayer(playerId, dirX, dirY, deltaTime);
   });
 
   // Place bomb
