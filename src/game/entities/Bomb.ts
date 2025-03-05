@@ -52,32 +52,62 @@ export class Bomb extends Phaser.Physics.Arcade.Sprite {
     explosionTiles.forEach(tile => {
       const explosion = this.scene.add.sprite(tile.x, tile.y, 'explosion');
       
-      // Set initial scale based on distance from bomb center
-      const centerTile = explosionTiles[0]; // First tile is the center
-      const distance = Phaser.Math.Distance.Between(
-        centerTile.x, centerTile.y, tile.x, tile.y
-      );
-      
-      // Scale based on distance and power
-      const baseScale = 0.6;
-      const powerScale = this.power * 0.2;
-      const distanceScale = distance > 0 ? Math.max(0.5, 1 - (distance / (this.power * 80))) : 1;
-      
-      explosion.setScale(baseScale * distanceScale * powerScale);
+      // Set initial scale and alpha
+      explosion.setScale(0.1);
+      explosion.setAlpha(1);
       
       // Create a grow and fade effect
       this.scene.tweens.add({
         targets: explosion,
-        scale: explosion.scale * 1.5,
-        alpha: 0,
-        duration: 500,
+        scale: { from: 0.1, to: 1 },
+        alpha: { from: 1, to: 0 },
+        duration: 300,
+        ease: 'Power2',
         onComplete: () => {
           explosion.destroy();
         }
       });
       
+      // Add particle effects
+      const particles = this.scene.add.particles(tile.x, tile.y, 'explosion', {
+        scale: { start: 0.2, end: 0 },
+        speed: { min: 50, max: 100 },
+        angle: { min: 0, max: 360 },
+        alpha: { start: 0.5, end: 0 },
+        lifespan: 300,
+        quantity: 5,
+        blendMode: 'ADD'
+      });
+      
+      // Stop emitting after a short duration
+      this.scene.time.delayedCall(100, () => {
+        particles.destroy();
+      });
+      
       this.explosionSprites.push(explosion);
     });
+    
+    // Create a flash effect
+    const flash = this.scene.add.rectangle(
+      this.x,
+      this.y,
+      800,
+      600,
+      0xffffff,
+      0.3
+    );
+    
+    this.scene.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 100,
+      onComplete: () => {
+        flash.destroy();
+      }
+    });
+    
+    // Add screen shake
+    this.scene.cameras.main.shake(200, 0.005);
     
     // Remove the bomb
     this.destroy();

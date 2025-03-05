@@ -13,10 +13,7 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 48,
     });
     this.load.image("bomb", "assets/bomb.png");
-    this.load.image(
-      "explosion",
-      "https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/explosion.png"
-    );
+    this.load.image("explosion", "assets/explosion.png");
     this.load.image("wall", "assets/wall.png");
     this.load.image("box", "assets/box.png");
     this.load.image("powerup_bomb", "assets/powerup_bomb.png");
