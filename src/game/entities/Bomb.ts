@@ -106,7 +106,7 @@ export class Bomb extends Phaser.Physics.Arcade.Sprite {
       const flash = this.scene.add.rectangle(
         this.x,
         this.y,
-        800,
+        600,
         600,
         0xffffff,
         0.3

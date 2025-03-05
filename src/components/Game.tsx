@@ -18,7 +18,7 @@ const Game: React.FC<GameProps> = ({ socket, roomId, playerId }) => {
     if (gameRef.current && !gameInstance.current) {
       const config: Phaser.Types.Core.GameConfig = {
         type: Phaser.AUTO,
-        width: 800,
+        width: 600,
         height: 600,
         parent: gameRef.current,
         physics: {
@@ -30,7 +30,6 @@ const Game: React.FC<GameProps> = ({ socket, roomId, playerId }) => {
         },
         scene: [BootScene, GameScene],
         scale: {
-          mode: Phaser.Scale.FIT,
           autoCenter: Phaser.Scale.CENTER_BOTH,
         },
       };

@@ -130,8 +130,8 @@ export class GameRoom {
           // Walls around the edges and in a grid pattern
           this.map[y][x] = 1;
         } else {
-          // 60% chance of a box in empty spaces
-          this.map[y][x] = Math.random() < 0.6 ? 2 : 0;
+          // 40% chance of a box in empty spaces
+          this.map[y][x] = Math.random() < 0.4 ? 2 : 0;
         }
       }
     }

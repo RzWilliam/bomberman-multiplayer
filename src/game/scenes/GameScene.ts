@@ -70,7 +70,7 @@ export class GameScene extends Phaser.Scene {
 
   private createMap() {
     // Create background
-    this.add.rectangle(0, 0, 800, 600, 0x00aa44).setOrigin(0, 0);
+    this.add.rectangle(0, 0, 600, 600, 0x00aa44).setOrigin(0, 0);
 
     // Create walls and boxes groups
     this.walls = this.physics.add.staticGroup();
