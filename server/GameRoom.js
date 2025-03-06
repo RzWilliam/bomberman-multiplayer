@@ -3,14 +3,16 @@ import { v4 as uuidv4 } from 'uuid';
 // Power-up types
 const POWERUP_TYPES = ['bomb', 'speed', 'power'];
 
-// Player speed constants
-const BASE_SPEED = 100;
-const MAX_SPEED = 200;
-
 // Game constants
 const TILE_SIZE = 40;
 const PLAYER_RADIUS = 12;
 const BOMB_RADIUS = 16;
+const MOVEMENT_DURATION = 200; // Time to move one tile in milliseconds
+
+// Player speed constants
+const BASE_SPEED = 50; // Initial speed value
+const SPEED_INCREMENT = 25; // How much speed increases with each power-up
+const MAX_SPEED = 150; // Maximum speed cap
 
 export class GameRoom {
   constructor(id, io) {
@@ -24,7 +26,8 @@ export class GameRoom {
     this.powerUps = {};
     this.gameLoopInterval = null;
     this.lastUpdateTime = 0;
-    this.playerBombOverlaps = new Map(); // Track which players are overlapping with which bombs
+    this.playerBombOverlaps = new Map();
+    this.playerMovements = new Map();
   }
 
   getPlayers() {
@@ -47,7 +50,8 @@ export class GameRoom {
       bombCount: 1,
       bombsPlaced: 0,
       bombPower: 1,
-      speed: BASE_SPEED,
+      speed: BASE_SPEED, // Initial speed value
+      isMoving: false,
       alive: true
     });
   }
@@ -55,6 +59,7 @@ export class GameRoom {
   removePlayer(playerId) {
     this.players = this.players.filter(player => player.id !== playerId);
     this.playerBombOverlaps.delete(playerId);
+    this.playerMovements.delete(playerId);
   }
 
   assignNewHost() {
@@ -79,20 +84,20 @@ export class GameRoom {
     this.bombs = {};
     this.powerUps = {};
     this.playerBombOverlaps.clear();
+    this.playerMovements.clear();
     
     if (this.gameLoopInterval) {
       clearInterval(this.gameLoopInterval);
       this.gameLoopInterval = null;
     }
     
-    // Reset player positions and stats
     this.players.forEach(player => {
       player.x = 0;
       player.y = 0;
       player.bombCount = 1;
       player.bombsPlaced = 0;
       player.bombPower = 1;
-      player.speed = BASE_SPEED;
+      player.isMoving = false;
       player.alive = true;
       player.isReady = false;
     });
@@ -110,42 +115,33 @@ export class GameRoom {
   }
 
   initializeGame() {
-    // Create the game map
     this.createMap();
-    
-    // Position players at spawn points
     this.positionPlayers();
   }
 
   createMap() {
-    const mapSize = 15; // 15x15 grid
+    const mapSize = 15;
     this.map = [];
     
-    // Initialize empty map
     for (let y = 0; y < mapSize; y++) {
       this.map[y] = [];
       for (let x = 0; x < mapSize; x++) {
-        // 0 = empty, 1 = wall, 2 = box
         if (x === 0 || y === 0 || x === mapSize - 1 || y === mapSize - 1 || (x % 2 === 0 && y % 2 === 0)) {
-          // Walls around the edges and in a grid pattern
           this.map[y][x] = 1;
         } else {
-          // 40% chance of a box in empty spaces
-          this.map[y][x] = Math.random() < 0.4 ? 2 : 0;
+          this.map[y][x] = Math.random() <= 0.6 ? 2 : 0; // 60% chance for box, 40% for empty space
         }
       }
     }
     
-    // Clear spawn areas for players
     const spawnPoints = [
-      { x: 1, y: 1 },                           // Top-left
-      { x: mapSize - 2, y: mapSize - 2 },       // Bottom-right
-      { x: mapSize - 2, y: 1 },                 // Top-right
-      { x: 1, y: mapSize - 2 }                  // Bottom-left
+      { x: 1, y: 1 },
+      { x: mapSize - 2, y: mapSize - 2 },
+      { x: mapSize - 2, y: 1 },
+      { x: 1, y: mapSize - 2 }
     ];
     
     spawnPoints.forEach(point => {
-      // Clear 3x3 area around spawn point
       for (let y = point.y - 1; y <= point.y + 1; y++) {
         for (let x = point.x - 1; x <= point.x + 1; x++) {
           if (y >= 0 && y < mapSize && x >= 0 && x < mapSize && this.map[y][x] !== 1) {
@@ -160,18 +156,120 @@ export class GameRoom {
     const mapSize = this.map.length;
     
     const spawnPoints = [
-      { x: 1, y: 1 },                           // Top-left
-      { x: mapSize - 2, y: mapSize - 2 },       // Bottom-right
-      { x: mapSize - 2, y: 1 },                 // Top-right
-      { x: 1, y: mapSize - 2 }                  // Bottom-left
+      { x: 1, y: 1 },
+      { x: mapSize - 2, y: mapSize - 2 },
+      { x: mapSize - 2, y: 1 },
+      { x: 1, y: mapSize - 2 }
     ];
     
-    // Assign spawn points to players
     this.players.forEach((player, index) => {
       const spawn = spawnPoints[index % spawnPoints.length];
       player.x = spawn.x * TILE_SIZE + TILE_SIZE / 2;
       player.y = spawn.y * TILE_SIZE + TILE_SIZE / 2;
     });
+  }
+
+  movePlayer(playerId, dirX, dirY) {
+    const player = this.getPlayerById(playerId);
+    if (!player || !player.alive || player.isMoving) {
+      this.io.to(this.id).emit('playerMoveRejected', { playerId });
+      return;
+    }
+
+    const currentGridX = Math.floor(player.x / TILE_SIZE);
+    const currentGridY = Math.floor(player.y / TILE_SIZE);
+
+    const targetGridX = currentGridX + dirX;
+    const targetGridY = currentGridY + dirY;
+
+    if (this.canMoveTo(targetGridX, targetGridY)) {
+      const targetX = targetGridX * TILE_SIZE + TILE_SIZE / 2;
+      const targetY = targetGridY * TILE_SIZE + TILE_SIZE / 2;
+
+      player.isMoving = true;
+      
+      // Calculate movement duration based on player speed
+      // As speed increases, duration decreases
+      const duration = Math.max(50, 200 - (player.speed - 150)); // Minimum 50ms duration
+
+      this.playerMovements.set(playerId, {
+        startX: player.x,
+        startY: player.y,
+        targetX,
+        targetY,
+        startTime: Date.now(),
+        duration
+      });
+
+      this.io.to(this.id).emit('playerMoveStart', {
+        playerId,
+        startX: player.x,
+        startY: player.y,
+        targetX,
+        targetY,
+        duration
+      });
+    } else {
+      this.io.to(this.id).emit('playerMoveRejected', { playerId });
+    }
+  }
+
+  canMoveTo(gridX, gridY) {
+    // Check map bounds
+    if (gridY < 0 || gridY >= this.map.length || gridX < 0 || gridX >= this.map[0].length) {
+      return false;
+    }
+
+    // Check for walls and boxes
+    if (this.map[gridY][gridX] !== 0) {
+      return false;
+    }
+
+    // Check for bombs
+    for (const bomb of Object.values(this.bombs)) {
+      const bombGridX = Math.floor(bomb.x / TILE_SIZE);
+      const bombGridY = Math.floor(bomb.y / TILE_SIZE);
+      if (bombGridX === gridX && bombGridY === gridY) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  update() {
+    const now = Date.now();
+    
+    // Update player movements
+    this.playerMovements.forEach((movement, playerId) => {
+      const player = this.getPlayerById(playerId);
+      if (!player) return;
+
+      const elapsed = now - movement.startTime;
+      const progress = Math.min(elapsed / movement.duration, 1);
+
+      if (progress < 1) {
+        // Interpolate position
+        player.x = movement.startX + (movement.targetX - movement.startX) * progress;
+        player.y = movement.startY + (movement.targetY - movement.startY) * progress;
+      } else {
+        // Movement complete
+        player.x = movement.targetX;
+        player.y = movement.targetY;
+        player.isMoving = false;
+        this.playerMovements.delete(playerId);
+        
+        // Check for power-ups at the new position
+        this.checkPowerUpCollection(player);
+      }
+    });
+
+    // Update bombs
+    this.updateBombs((now - this.lastUpdateTime) / 1000);
+    this.updateBombOverlaps();
+    this.checkGameOver();
+
+    this.lastUpdateTime = now;
   }
 
   startGameLoop() {
@@ -184,27 +282,9 @@ export class GameRoom {
         return;
       }
       
-      // Update game state
       this.update();
-      
-      // Send game state to all players
       this.io.to(this.id).emit('gameState', this.getGameState());
-    }, 1000 / 30); // 30 FPS
-  }
-
-  update() {
-    const now = Date.now();
-    const deltaTime = (now - this.lastUpdateTime) / 1000; // Convert to seconds
-    this.lastUpdateTime = now;
-    
-    // Update bombs
-    this.updateBombs(deltaTime);
-    
-    // Update bomb overlaps
-    this.updateBombOverlaps();
-    
-    // Check for game over condition
-    this.checkGameOver();
+    }, 1000 / 60); // 60 FPS
   }
 
   updateBombs(deltaTime) {
@@ -219,7 +299,6 @@ export class GameRoom {
   }
 
   updateBombOverlaps() {
-    // Update which players are overlapping with which bombs
     this.players.forEach(player => {
       if (!player.alive) return;
 
@@ -239,122 +318,13 @@ export class GameRoom {
     });
   }
 
-  movePlayer(playerId, dirX, dirY, deltaTime) {
-    const player = this.getPlayerById(playerId);
-    if (!player || !player.alive) return;
-
-    // Calculate new position
-    const distance = player.speed * deltaTime;
-    let newX = player.x + dirX * distance;
-    let newY = player.y + dirY * distance;
-
-    // Check collisions with walls and boxes
-    if (this.canMoveTo(newX, newY, player)) {      
-      // Check collisions with bombs, but only with bombs the player isn't already overlapping
-      const bombCollision = this.checkBombCollisions(newX, newY, player);
-
-      if (!bombCollision) {
-        player.x = newX;
-        player.y = newY;
-      } else {
-        // Try sliding along walls
-        if (dirX !== 0 && this.canMoveTo(player.x, newY, player) && 
-            !this.checkBombCollisions(player.x, newY, player)) {
-          player.y = newY;
-        } else if (dirY !== 0 && this.canMoveTo(newX, player.y, player) && 
-                   !this.checkBombCollisions(newX, player.y, player)) {
-          player.x = newX;
-        }
-      }
-    }
-
-    this.checkPowerUpCollection(player);
-  }
-
-  canMoveTo(x, y, player) {
-    // Get the grid coordinates
-    const gridX = Math.floor(x / TILE_SIZE);
-    const gridY = Math.floor(y / TILE_SIZE);
-    
-    // Check surrounding tiles
-    for (let offsetY = -1; offsetY <= 1; offsetY++) {
-      for (let offsetX = -1; offsetX <= 1; offsetX++) {
-        const checkX = gridX + offsetX;
-        const checkY = gridY + offsetY;
-        
-        // Skip if out of bounds
-        if (checkY < 0 || checkY >= this.map.length || checkX < 0 || checkX >= this.map[0].length) {
-          continue;
-        }
-        
-        // If the tile is a wall or box
-        if (this.map[checkY][checkX] === 1 || this.map[checkY][checkX] === 2) {
-          // Calculate the closest point on the tile to the player
-          const tileLeft = checkX * TILE_SIZE;
-          const tileRight = tileLeft + TILE_SIZE;
-          const tileTop = checkY * TILE_SIZE;
-          const tileBottom = tileTop + TILE_SIZE;
-          
-          const closestX = Math.max(tileLeft, Math.min(x, tileRight));
-          const closestY = Math.max(tileTop, Math.min(y, tileBottom));
-          
-          // Calculate distance from closest point to player center
-          const distX = x - closestX;
-          const distY = y - closestY;
-          const distance = Math.sqrt(distX * distX + distY * distY);
-          
-          // If the distance is less than the player radius, there's a collision
-          if (distance < PLAYER_RADIUS) {
-            return false;
-          }
-        }
-      }
-    }
-    
-    return true;
-  }
-
-  // checkPlayerCollisions(x, y, currentPlayer) {
-  //   return this.players.some(player => {
-  //     if (player.id === currentPlayer.id || !player.alive) return false;
-
-  //     const dx = x - player.x;
-  //     const dy = y - player.y;
-  //     const distance = Math.sqrt(dx * dx + dy * dy);
-
-  //     return distance < PLAYER_RADIUS * 2;
-  //   });
-  // }
-
-  checkBombCollisions(x, y, player) {
-    const overlappingBombs = this.playerBombOverlaps.get(player.id) || new Set();
-
-    return Object.values(this.bombs).some(bomb => {
-      // Skip bombs that the player is already overlapping with
-      if (overlappingBombs.has(bomb.id)) {
-        return false;
-      }
-
-      const dx = x - bomb.x;
-      const dy = y - bomb.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      return distance < (PLAYER_RADIUS + BOMB_RADIUS);
-    });
-  }
-
   placeBomb(playerId) {
     const player = this.getPlayerById(playerId);
-    if (!player || !player.alive) return;
+    if (!player || !player.alive || player.bombsPlaced >= player.bombCount) return;
     
-    // Check if player has bombs available
-    if (player.bombsPlaced >= player.bombCount) return;
-    
-    // Get the grid coordinates
     const gridX = Math.floor(player.x / TILE_SIZE);
     const gridY = Math.floor(player.y / TILE_SIZE);
     
-    // Check if there's already a bomb at this position
     const bombPosition = `${gridX},${gridY}`;
     for (const bombId in this.bombs) {
       if (this.bombs[bombId].position === bombPosition) {
@@ -362,7 +332,6 @@ export class GameRoom {
       }
     }
     
-    // Create a new bomb
     const bombId = uuidv4();
     const bomb = {
       id: bombId,
@@ -373,18 +342,16 @@ export class GameRoom {
       gridY,
       position: bombPosition,
       power: player.bombPower,
-      timer: 3 // 3 seconds until explosion
+      timer: 3
     };
     
     this.bombs[bombId] = bomb;
     player.bombsPlaced++;
 
-    // Add the bomb to the player's overlapping bombs set
     const overlappingBombs = this.playerBombOverlaps.get(playerId) || new Set();
     overlappingBombs.add(bombId);
     this.playerBombOverlaps.set(playerId, overlappingBombs);
     
-    // Notify clients
     this.io.to(this.id).emit('bombPlaced', { bomb });
   }
 
@@ -399,7 +366,6 @@ export class GameRoom {
     
     const explosionTiles = [];
     
-    // Add center tile
     explosionTiles.push({
       x: bomb.x,
       y: bomb.y,
@@ -407,7 +373,6 @@ export class GameRoom {
       gridY: bomb.gridY
     });
     
-    // Directions: right, left, down, up
     const directions = [
       { x: 1, y: 0 },
       { x: -1, y: 0 },
@@ -415,23 +380,19 @@ export class GameRoom {
       { x: 0, y: -1 }
     ];
     
-    // Check each direction
     directions.forEach(dir => {
       for (let i = 1; i <= bomb.power; i++) {
         const checkX = bomb.gridX + dir.x * i;
         const checkY = bomb.gridY + dir.y * i;
         
-        // Skip if out of bounds
         if (checkY < 0 || checkY >= this.map.length || checkX < 0 || checkX >= this.map[0].length) {
           break;
         }
         
-        // If hit a wall, stop in this direction
         if (this.map[checkY][checkX] === 1) {
           break;
         }
         
-        // Add explosion tile
         explosionTiles.push({
           x: checkX * TILE_SIZE + TILE_SIZE / 2,
           y: checkY * TILE_SIZE + TILE_SIZE / 2,
@@ -439,7 +400,6 @@ export class GameRoom {
           gridY: checkY
         });
         
-        // If hit a box, destroy it and stop in this direction
         if (this.map[checkY][checkX] === 2) {
           this.destroyBox(checkX, checkY);
           break;
@@ -447,14 +407,12 @@ export class GameRoom {
       }
     });
     
-    // Check for player damage
     this.players.forEach(player => {
       if (!player.alive) return;
       
       const playerGridX = Math.floor(player.x / TILE_SIZE);
       const playerGridY = Math.floor(player.y / TILE_SIZE);
       
-      // Check if player is in explosion range
       const inExplosion = explosionTiles.some(tile => 
         tile.gridX === playerGridX && tile.gridY === playerGridY
       );
@@ -464,7 +422,6 @@ export class GameRoom {
       }
     });
 
-    // Remove the bomb from all players' overlapping sets
     this.players.forEach(player => {
       const overlappingBombs = this.playerBombOverlaps.get(player.id);
       if (overlappingBombs) {
@@ -472,25 +429,20 @@ export class GameRoom {
       }
     });
     
-    // Notify clients
     this.io.to(this.id).emit('bombExploded', {
       bombId,
       explosionTiles
     });
     
-    // Remove the bomb
     delete this.bombs[bombId];
   }
 
   destroyBox(x, y) {
-    // Set the map tile to empty
     this.map[y][x] = 0;
     
-    // Notify clients
     this.io.to(this.id).emit('boxDestroyed', { x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2 });
     
-    // 30% chance to spawn a power-up
-    if (Math.random() < 0.3) {
+    if (Math.random() <= 0.5) { // 50% chance to spawn a power-up
       this.spawnPowerUp(x, y);
     }
   }
@@ -510,7 +462,6 @@ export class GameRoom {
     
     this.powerUps[powerUpId] = powerUp;
     
-    // Notify clients
     this.io.to(this.id).emit('powerUpSpawned', { powerUp });
   }
 
@@ -533,27 +484,24 @@ export class GameRoom {
     
     if (!player || !powerUp) return;
     
-    // Apply power-up effect
     switch (powerUp.type) {
       case 'bomb':
         player.bombCount++;
         break;
       case 'speed':
-        // Increase speed but don't exceed max speed
-        player.speed = Math.min(player.speed + 20, MAX_SPEED);
+        // Increase speed with a smaller increment and lower maximum cap
+        player.speed = Math.min(player.speed + SPEED_INCREMENT, MAX_SPEED);
         break;
       case 'power':
         player.bombPower++;
         break;
     }
     
-    // Notify clients
     this.io.to(this.id).emit('powerUpCollected', {
       powerUpId,
       playerId
     });
     
-    // Remove the power-up
     delete this.powerUps[powerUpId];
   }
 
@@ -563,32 +511,25 @@ export class GameRoom {
     
     player.alive = false;
     
-    // Notify clients
     this.io.to(this.id).emit('playerDied', { playerId });
     
-    // Check if game is over
     this.checkGameOver();
   }
 
   checkGameOver() {
-    // Count alive players
     const alivePlayers = this.players.filter(player => player.alive);
     
-    // If only one player is left, they win
     if (alivePlayers.length === 1 && this.players.length > 1) {
       const winner = alivePlayers[0];
       this.gameOver = true;
       
-      // Notify clients
       this.io.to(this.id).emit('gameOver', {
         winner: winner.name
       });
     }
-    // If no players are left, it's a draw
     else if (alivePlayers.length === 0 && this.players.length > 0) {
       this.gameOver = true;
       
-      // Notify clients
       this.io.to(this.id).emit('gameOver', {
         winner: 'Nobody'
       });
@@ -610,7 +551,8 @@ export class GameRoom {
           bombCount: player.bombCount,
           bombPower: player.bombPower,
           speed: player.speed,
-          alive: player.alive
+          alive: player.alive,
+          isMoving: player.isMoving
         };
         return acc;
       }, {}),
