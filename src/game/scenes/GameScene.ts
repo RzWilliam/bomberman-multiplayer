@@ -442,7 +442,7 @@ export class GameScene extends Phaser.Scene {
       .text(
         this.cameras.main.centerX,
         this.cameras.main.centerY - 50,
-        `${winner} wins!`,
+        `GAME OVER!`,
         {
           fontSize: "32px",
           color: "#ffffff",
@@ -453,7 +453,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // Add a delay before returning to the lobby
-    this.time.delayedCall(5000, () => {
+    this.time.delayedCall(3000, () => {
       if (winnerText.scene) {
         winnerText.destroy();
       }

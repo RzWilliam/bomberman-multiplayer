@@ -56,7 +56,9 @@ function App() {
 
     socketConnection.on("gameOver", (data) => {
       setWinner(data.winner);
-      setGameState(GameState.GAME_OVER);
+      setTimeout(() => {
+        setGameState(GameState.GAME_OVER);
+      }, 3000);
     });
 
     socketConnection.on("error", (data) => {

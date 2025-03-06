@@ -28,7 +28,7 @@ export class BootScene extends Phaser.Scene {
     const width = this.cameras.main.width;
     const height = this.cameras.main.height;
     const loadingText = this.make.text({
-      x: width / 2,
+      x: width,
       y: height / 2 - 50,
       text: "Loading...",
       style: {
