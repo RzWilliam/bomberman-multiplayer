@@ -1,9 +1,9 @@
-import Phaser from 'phaser';
+import Phaser from "phaser";
 
 export enum PowerUpType {
-  BOMB = 'bomb',
-  SPEED = 'speed',
-  POWER = 'power'
+  BOMB = "bomb",
+  SPEED = "speed",
+  POWER = "power",
 }
 
 export class PowerUp extends Phaser.Physics.Arcade.Sprite {
@@ -28,13 +28,17 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
     // Set power-up properties
     this.setScale(0.8);
 
+    // Set up a smaller collision box
+    this.setSize(24, 24);
+    this.setOffset(4, 4);
+
     // Add a pulsing effect
     scene.tweens.add({
       targets: this,
-      scale: 1,
+      scale: 0.85,
       duration: 500,
       yoyo: true,
-      repeat: -1
+      repeat: -1,
     });
   }
 
@@ -42,12 +46,12 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
     // Play collection animation
     this.scene.tweens.add({
       targets: this,
-      scale: 1.5,
+      scale: 1,
       alpha: 0,
       duration: 300,
       onComplete: () => {
         this.destroy();
-      }
+      },
     });
   }
 }

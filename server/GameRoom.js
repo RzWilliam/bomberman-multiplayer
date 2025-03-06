@@ -7,12 +7,12 @@ const POWERUP_TYPES = ['bomb', 'speed', 'power'];
 const TILE_SIZE = 40;
 const PLAYER_RADIUS = 12;
 const BOMB_RADIUS = 16;
-const MOVEMENT_DURATION = 200; // Time to move one tile in milliseconds
+const MOVEMENT_DURATION = 200;
 
 // Player speed constants
-const BASE_SPEED = 50; // Initial speed value
-const SPEED_INCREMENT = 25; // How much speed increases with each power-up
-const MAX_SPEED = 150; // Maximum speed cap
+const BASE_SPEED = 50;
+const SPEED_INCREMENT = 25;
+const MAX_SPEED = 150;
 
 export class GameRoom {
   constructor(id, io) {
@@ -50,7 +50,7 @@ export class GameRoom {
       bombCount: 1,
       bombsPlaced: 0,
       bombPower: 1,
-      speed: BASE_SPEED, // Initial speed value
+      speed: BASE_SPEED,
       isMoving: false,
       alive: true
     });
@@ -129,7 +129,7 @@ export class GameRoom {
         if (x === 0 || y === 0 || x === mapSize - 1 || y === mapSize - 1 || (x % 2 === 0 && y % 2 === 0)) {
           this.map[y][x] = 1;
         } else {
-          this.map[y][x] = Math.random() <= 0.6 ? 2 : 0; // 60% chance for box, 40% for empty space
+          this.map[y][x] = Math.random() <= 0.6 ? 2 : 0;
         }
       }
     }
@@ -188,9 +188,7 @@ export class GameRoom {
 
       player.isMoving = true;
       
-      // Calculate movement duration based on player speed
-      // As speed increases, duration decreases
-      const duration = Math.max(50, 200 - (player.speed - 150)); // Minimum 50ms duration
+      const duration = Math.max(50, 200 - (player.speed - 150));
 
       this.playerMovements.set(playerId, {
         startX: player.x,
@@ -215,17 +213,14 @@ export class GameRoom {
   }
 
   canMoveTo(gridX, gridY) {
-    // Check map bounds
     if (gridY < 0 || gridY >= this.map.length || gridX < 0 || gridX >= this.map[0].length) {
       return false;
     }
 
-    // Check for walls and boxes
     if (this.map[gridY][gridX] !== 0) {
       return false;
     }
 
-    // Check for bombs
     for (const bomb of Object.values(this.bombs)) {
       const bombGridX = Math.floor(bomb.x / TILE_SIZE);
       const bombGridY = Math.floor(bomb.y / TILE_SIZE);
@@ -240,7 +235,6 @@ export class GameRoom {
   update() {
     const now = Date.now();
     
-    // Update player movements
     this.playerMovements.forEach((movement, playerId) => {
       const player = this.getPlayerById(playerId);
       if (!player) return;
@@ -249,22 +243,18 @@ export class GameRoom {
       const progress = Math.min(elapsed / movement.duration, 1);
 
       if (progress < 1) {
-        // Interpolate position
         player.x = movement.startX + (movement.targetX - movement.startX) * progress;
         player.y = movement.startY + (movement.targetY - movement.startY) * progress;
       } else {
-        // Movement complete
         player.x = movement.targetX;
         player.y = movement.targetY;
         player.isMoving = false;
         this.playerMovements.delete(playerId);
         
-        // Check for power-ups at the new position
         this.checkPowerUpCollection(player);
       }
     });
 
-    // Update bombs
     this.updateBombs((now - this.lastUpdateTime) / 1000);
     this.updateBombOverlaps();
     this.checkGameOver();
@@ -284,7 +274,7 @@ export class GameRoom {
       
       this.update();
       this.io.to(this.id).emit('gameState', this.getGameState());
-    }, 1000 / 60); // 60 FPS
+    }, 1000 / 60);
   }
 
   updateBombs(deltaTime) {
@@ -442,7 +432,7 @@ export class GameRoom {
     
     this.io.to(this.id).emit('boxDestroyed', { x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2 });
     
-    if (Math.random() <= 0.5) { // 50% chance to spawn a power-up
+    if (Math.random() <= 0.5) {
       this.spawnPowerUp(x, y);
     }
   }
@@ -489,7 +479,6 @@ export class GameRoom {
         player.bombCount++;
         break;
       case 'speed':
-        // Increase speed with a smaller increment and lower maximum cap
         player.speed = Math.min(player.speed + SPEED_INCREMENT, MAX_SPEED);
         break;
       case 'power':
@@ -499,7 +488,8 @@ export class GameRoom {
     
     this.io.to(this.id).emit('powerUpCollected', {
       powerUpId,
-      playerId
+      playerId,
+      powerUpType: powerUp.type
     });
     
     delete this.powerUps[powerUpId];
