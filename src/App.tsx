@@ -76,7 +76,8 @@ function App() {
     }
   };
 
-  const joinRoom = () => {
+  const joinRoom = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     if (socket && roomId && playerName.trim()) {
       socket.emit("joinRoom", { roomId, playerId, playerName });
     }
@@ -168,24 +169,29 @@ function App() {
               </button>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">Room ID</label>
-              <input
-                type="text"
-                value={roomId}
-                onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                className="w-full p-2 bg-gray-700 rounded text-white"
-                placeholder="Enter room ID"
-              />
-            </div>
+            <form onSubmit={joinRoom}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">
+                  Room ID
+                </label>
+                <input
+                  type="text"
+                  value={roomId}
+                  required
+                  onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+                  className="w-full p-2 bg-gray-700 rounded text-white"
+                  placeholder="Enter room ID"
+                />
+              </div>
 
-            <button
-              onClick={joinRoom}
-              disabled={!roomId || !playerName.trim()}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed p-3 rounded font-medium transition-all"
-            >
-              Join Game
-            </button>
+              <button
+                type="submit"
+                disabled={!roomId || !playerName.trim()}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed p-3 rounded font-medium transition-all"
+              >
+                Join Game
+              </button>
+            </form>
           </div>
         </div>
       )}
