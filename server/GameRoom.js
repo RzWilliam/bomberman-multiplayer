@@ -503,7 +503,9 @@ export class GameRoom {
     
     this.io.to(this.id).emit('playerDied', { playerId });
     
-    this.checkGameOver();
+    setTimeout(() => {
+      this.checkGameOver();
+    }, 1000);
   }
 
   checkGameOver() {
