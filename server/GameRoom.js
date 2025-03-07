@@ -97,6 +97,7 @@ export class GameRoom {
       player.bombCount = 1;
       player.bombsPlaced = 0;
       player.bombPower = 1;
+      player.speed = BASE_SPEED;
       player.isMoving = false;
       player.alive = true;
       player.isReady = false;
