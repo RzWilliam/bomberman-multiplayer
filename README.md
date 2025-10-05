@@ -1,54 +1,87 @@
-# React + TypeScript + Vite
+<p align="center">
+	<img src="public/icon.png" alt="Bomberman Multiplayer" width="140" />
+</p>
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<br>
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+# Bomberman — Multiplayer
 
-## Expanding the ESLint configuration
+>A small multiplayer Bomberman-like game built with React, Phaser and Socket.io.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Quick demo
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+Open the app locally (see instructions below) and create or join a room to play with friends on the same network.
+
+## Requirements
+
+- Node.js (recommended 18+)
+- npm (or a compatible package manager)
+
+## Install
+
+Clone the repo and install dependencies:
+
+```bash
+git clone https://github.com/RzWilliam/bomberman-multiplayer.git
+cd bomberman-multiplayer
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Run (development)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- Start the frontend dev server:
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+```bash
+npm run dev
 ```
+
+- Start only the backend server:
+
+```bash
+npm run server
+```
+
+- Start both the frontend and backend together (uses concurrently):
+
+```bash
+npm run start
+```
+
+## Build & Preview
+
+Build a production bundle for the client:
+
+```bash
+npm run build
+```
+
+Preview the built client locally:
+
+```bash
+npm run preview
+```
+
+## Project structure
+
+- public/
+	- assets/ (game sprites and icons)
+	- icon.png (project logo used in README)
+- server/
+	- index.js (Express + Socket.io server entry)
+	- GameRoom.js (server game room logic)
+- src/
+	- components/ (React UI components: Lobby, Game, etc.)
+	- game/ (Phaser scenes and entities)
+	- main.tsx (React entry)
+
+## How to play locally
+
+1. Start the server (`npm run server`) or run both with `npm run start`.
+2. Open the frontend (usually at http://localhost:5173) in multiple browser windows or on different devices on the same network.
+3. Create a room, share the room ID, and have others join to start playing.
+
+## Notes
+
+- This project is an experimental/demo implementation. Expect rough edges.
